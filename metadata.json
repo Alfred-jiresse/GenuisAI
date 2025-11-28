@@ -1,0 +1,5 @@
+{
+  "name": "StudyGeniusAI",
+  "description": "An intelligent study assistant that transforms study materials into summaries, flashcards, quizzes, and study plans using Gemini AI.",
+  "requestFramePermissions": []
+}

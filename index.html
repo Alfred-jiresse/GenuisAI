@@ -19,16 +19,16 @@
             },
             colors: {
               primary: {
-                DEFAULT: '#6366F1', // Indigo 500
-                hover: '#4F46E5',   // Indigo 600
-                dark: '#818CF8',    // Indigo 400
+                DEFAULT: '#6366F1',
+                hover: '#4F46E5',
+                dark: '#818CF8',
               },
               secondary: {
-                DEFAULT: '#10B981', // Emerald 500
-                dark: '#34D399',    // Emerald 400
+                DEFAULT: '#10B981',
+                dark: '#34D399',
               },
               accent: {
-                DEFAULT: '#FBBF24', // Amber 400
+                DEFAULT: '#FBBF24',
               },
               background: {
                 light: '#F9FAFB',
@@ -43,53 +43,26 @@
         }
       }
     </script>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-      body {
-        font-family: 'Inter', sans-serif;
+    <script type="importmap">
+    {
+      "imports": {
+        "vite": "https://aistudiocdn.com/vite@^7.2.4",
+        "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+        "react/": "https://aistudiocdn.com/react@^19.2.0/",
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24",
+        "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/",
+        "react-markdown": "https://aistudiocdn.com/react-markdown@^10.1.0",
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
       }
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #f1f1f1; 
-      }
-      .dark ::-webkit-scrollbar-track {
-        background: #1f2937;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #c7c7c7; 
-        border-radius: 4px;
-      }
-      .dark ::-webkit-scrollbar-thumb {
-        background: #4b5563;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #a8a8a8; 
-      }
-    </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-markdown": "https://aistudiocdn.com/react-markdown@^10.1.0",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "firebase/app": "https://esm.sh/firebase@10.8.0/app",
-    "firebase/analytics": "https://esm.sh/firebase@10.8.0/analytics",
-    "firebase/firestore": "https://esm.sh/firebase@10.8.0/firestore",
-    "firebase/auth": "https://esm.sh/firebase@10.8.0/auth",
-    "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/"
-  }
-}
-</script>
+    }
+    </script>
+  <link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-background-light text-gray-900 antialiased dark:bg-background-dark dark:text-gray-100 transition-colors duration-300">
     <div id="root"></div>
-</body>
+    <script type="module" src="/index.tsx"></script>
+  </body>
 </html>

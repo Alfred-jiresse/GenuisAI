@@ -9,7 +9,6 @@ import WelcomeScreen from './components/WelcomeScreen';
 import LoginScreen from './components/LoginScreen';
 import { generateStudyMaterial, initializeChatSession } from './services/geminiService';
 import { UploadCloud, X, Sparkles, GraduationCap, Sun, Moon, Languages, LogOut, FileText, Clock, User as UserIcon } from './components/Icons';
-import { Chat } from '@google/genai';
 
 const TRANSLATIONS = {
   en: {
@@ -213,7 +212,7 @@ function App() {
   // Chat State
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const chatSessionRef = useRef<Chat | null>(null);
+  const chatSessionRef = useRef<any>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 

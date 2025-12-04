@@ -1,10 +1,10 @@
-// firebase.ts
-
+// Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyB8PHjRMln_s_znJwdctGQm5fZUV71OefI",
   authDomain: "genuisai-b4574.firebaseapp.com",
@@ -14,12 +14,12 @@ const firebaseConfig = {
   appId: "1:355181203722:web:9e75c3cc14f64a6b7baaf3"
 };
 
-// Empêche Firebase de s'initialiser deux fois
+// Initialize Firebase safely (prevent double initialization in dev)
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Exporte les services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+// Initialize services
+const db = getFirestore(app);
+const auth = getAuth(app);
+const storage = getStorage(app);
 
-export default app;
+export { app, db, auth, storage };

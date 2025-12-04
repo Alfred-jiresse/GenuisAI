@@ -7,8 +7,9 @@ import MarkdownView from './components/MarkdownView';
 import ChatView from './components/ChatView';
 import WelcomeScreen from './components/WelcomeScreen';
 import LoginScreen from './components/LoginScreen';
-import { generateStudyMaterial, initializeChatSession } from './services/geminiService';
+import { generateStudyMaterial, initializeChatSession, sendChatMessage } from './services/geminiService';
 import { UploadCloud, X, Sparkles, GraduationCap, Sun, Moon, Languages, LogOut, FileText, Clock, User as UserIcon } from './components/Icons';
+import { Chat } from '@google/genai';
 
 const TRANSLATIONS = {
   en: {
@@ -212,7 +213,7 @@ function App() {
   // Chat State
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const chatSessionRef = useRef<any>(null);
+  const chatSessionRef = useRef<Chat | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -251,12 +252,13 @@ function App() {
     setTextInput('');
     setGeneratedContent({});
     setChatHistory([]);
+    chatSessionRef.current = null;
   };
 
   // Reset chat when content changes or language changes
   useEffect(() => {
-    chatSessionRef.current = null;
     setChatHistory([]);
+    chatSessionRef.current = null;
   }, [fileData, textInput, language]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -306,17 +308,15 @@ function App() {
 
   const handleSendMessage = async (message: string) => {
     const initialized = await initChatIfNeeded();
-    if (!initialized) return;
+    if (!initialized || !chatSessionRef.current) return;
 
-    if (!chatSessionRef.current) return;
-
+    // Optimistically add user message
     const newHistory = [...chatHistory, { role: 'user' as const, text: message }];
     setChatHistory(newHistory);
     setIsChatLoading(true);
 
     try {
-      const result = await chatSessionRef.current.sendMessage({ message });
-      const responseText = result.text;
+      const responseText = await sendChatMessage(chatSessionRef.current, message);
       setChatHistory(prev => [...prev, { role: 'model', text: responseText }]);
     } catch (error) {
       console.error("Chat error:", error);

@@ -10,30 +10,55 @@ export default async function handler(req, res) {
   const apiKey = process.env.API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'API_KEY is not configured on the server.' });
+    console.error("API_KEY missing in environment variables.");
+    return res.status(500).json({ error: 'Server configuration error: API_KEY missing.' });
   }
 
   const ai = new GoogleGenAI({ apiKey });
   const MODEL_NAME = "gemini-2.5-flash";
 
   try {
-    // Handle CHAT mode
+    // --- CHAT MODE ---
     if (mode === 'CHAT') {
       const history = chatHistory || [];
-      const lastMessage = history.pop(); // Remove the user's last message to send it as 'message'
+      const userMessage = history.pop(); // The last message is the user's new input
       
-      // If history is empty, initialize it with system instructions
-      // Note: In stateless API, we rebuild the chat every time.
+      // If history is empty, initialize it with system instructions via context or logic
+      // Ideally, the client sends the full conversation.
+      
+      const languageInstruction = language === 'fr' 
+      ? "IMPORTANT: You MUST reply in FRENCH." 
+      : "IMPORTANT: You MUST reply in ENGLISH.";
+
+      const systemInstruction = `
+        You are StudyGeniusAI, an intelligent study assistant.
+        Mission:
+        - Summarize PDFs, images, and texts
+        - Generate quizzes, flashcards, and explanations
+        - Create study plans (1 to 30 days)
+        - Tutor the user in any subject with step-by-step clarity
+        Behavior Rules:
+        - Always use a friendly, motivating tone.
+        - Adapt your explanations to the user’s level.
+        - Always answer step by step if the user asks for explanations.
+        - Never invent fake data; ask for more details if needed.
+        - Use tables, bullet points, and clean structure.
+        - ${languageInstruction}
+        ${additionalContext ? `Additional context: ${additionalContext}` : ''}
+      `;
+      
+      // Create chat with history (excluding the new message which we send via sendMessage)
       const chat = ai.chats.create({
         model: MODEL_NAME,
-        history: history.length > 0 ? history : undefined, // Pass previous history
+        config: { systemInstruction },
+        history: history
       });
 
-      const result = await chat.sendMessage({ message: lastMessage.parts[0].text });
+      const result = await chat.sendMessage({ message: userMessage.parts[0].text });
       return res.status(200).json({ text: result.text });
     }
 
-    // Handle Standard Modes (Summary, Quiz, etc.)
+    // --- STANDARD GENERATION MODES ---
     const parts = [];
     if (fileData) {
       parts.push({

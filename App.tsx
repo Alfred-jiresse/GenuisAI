@@ -9,7 +9,6 @@ import WelcomeScreen from './components/WelcomeScreen';
 import LoginScreen from './components/LoginScreen';
 import { generateStudyMaterial, initializeChatSession, sendChatMessage } from './services/geminiService';
 import { UploadCloud, X, Sparkles, GraduationCap, Sun, Moon, Languages, LogOut, FileText, Clock, User as UserIcon } from './components/Icons';
-import { Chat } from '@google/genai';
 
 const TRANSLATIONS = {
   en: {
@@ -213,7 +212,7 @@ function App() {
   // Chat State
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const chatSessionRef = useRef<Chat | null>(null);
+  const [chatInitialized, setChatInitialized] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -252,13 +251,13 @@ function App() {
     setTextInput('');
     setGeneratedContent({});
     setChatHistory([]);
-    chatSessionRef.current = null;
+    setChatInitialized(false);
   };
 
   // Reset chat when content changes or language changes
   useEffect(() => {
     setChatHistory([]);
-    chatSessionRef.current = null;
+    setChatInitialized(false);
   }, [fileData, textInput, language]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -284,14 +283,14 @@ function App() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const initChatIfNeeded = async () => {
-    if (!chatSessionRef.current) {
+  const initChatIfNeeded = () => {
+    if (!chatInitialized) {
       // Get the correct welcome message based on user status
       const welcomeMsg = user?.isGuest ? t.welcomeMessages.guest : t.welcomeMessages.user;
 
       if (!fileData && !textInput.trim()) return false;
       
-      const { chat, initialMessages } = initializeChatSession({
+      const { initialMessages } = initializeChatSession({
         mode: AppMode.CHAT,
         textInput,
         fileData: fileData ? { mimeType: fileData.mimeType, data: fileData.data } : undefined,
@@ -300,15 +299,15 @@ function App() {
         customWelcomeMessage: welcomeMsg
       });
       
-      chatSessionRef.current = chat;
       setChatHistory(initialMessages);
+      setChatInitialized(true);
     }
     return true;
   };
 
   const handleSendMessage = async (message: string) => {
-    const initialized = await initChatIfNeeded();
-    if (!initialized || !chatSessionRef.current) return;
+    const initialized = initChatIfNeeded();
+    if (!initialized) return;
 
     // Optimistically add user message
     const newHistory = [...chatHistory, { role: 'user' as const, text: message }];
@@ -316,7 +315,19 @@ function App() {
     setIsChatLoading(true);
 
     try {
-      const responseText = await sendChatMessage(chatSessionRef.current, message);
+      const responseText = await sendChatMessage(
+        chatHistory, // Send the *current* history (before new msg) or newHistory minus last?
+        // Actually for simplicity, let's pass the HISTORY (excluding current message) and the MESSAGE separately
+        // But here I passed `chatHistory` which is the state BEFORE update in a functional update pattern...
+        // Let's rely on the chatHistory state which contains previous messages.
+        message, 
+        {
+          fileData,
+          textInput,
+          additionalContext,
+          language
+        }
+      );
       setChatHistory(prev => [...prev, { role: 'model', text: responseText }]);
     } catch (error) {
       console.error("Chat error:", error);
@@ -330,7 +341,7 @@ function App() {
     if (!fileData && !textInput.trim()) return;
 
     if (activeMode === AppMode.CHAT) {
-      await initChatIfNeeded();
+      initChatIfNeeded();
       return;
     }
 
@@ -355,14 +366,14 @@ function App() {
     }
   };
 
-  const handleTabChange = async (mode: AppMode) => {
+  const handleTabChange = (mode: AppMode) => {
     setActiveMode(mode);
     setLoading('idle');
     
     if (mode === AppMode.CHAT) {
       // Auto-initialize chat if content exists
       if (fileData || textInput.trim()) {
-        await initChatIfNeeded();
+        initChatIfNeeded();
       }
     }
   };

@@ -1,64 +1,98 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export default async function handler(req, res) {
-  // Ensure we only handle POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { mode, textInput, fileData, additionalContext, language, chatHistory } = req.body;
+  const { mode, textInput, fileData, additionalContext, language, history, message } = req.body;
   const apiKey = process.env.API_KEY;
 
   if (!apiKey) {
     console.error("API_KEY missing in environment variables.");
-    return res.status(500).json({ error: 'Server configuration error: API_KEY missing.' });
+    return res.status(500).json({ error: 'Configuration serveur : Clé API manquante.' });
   }
 
   const ai = new GoogleGenAI({ apiKey });
   const MODEL_NAME = "gemini-2.5-flash";
 
   try {
+    const languageInstruction = language === 'fr' 
+      ? "IMPORTANT: You MUST generate content/reply in FRENCH." 
+      : "IMPORTANT: You MUST generate content/reply in ENGLISH.";
+
+    const basePersona = `
+      You are StudyGeniusAI, an intelligent study assistant.
+      Tone: Friendly, motivating, and adapted to the student's level.
+      Rules:
+      - Explain step-by-step.
+      - Use clear structures (bullet points, tables).
+      - No fake data.
+      - ${languageInstruction}
+    `;
+
     // --- CHAT MODE ---
     if (mode === 'CHAT') {
-      const history = chatHistory || [];
-      const userMessage = history.pop(); // The last message is the user's new input
-      
-      // If history is empty, initialize it with system instructions via context or logic
-      // Ideally, the client sends the full conversation.
-      
-      const languageInstruction = language === 'fr' 
-      ? "IMPORTANT: You MUST reply in FRENCH." 
-      : "IMPORTANT: You MUST reply in ENGLISH.";
-
       const systemInstruction = `
-        You are StudyGeniusAI, an intelligent study assistant.
+        ${basePersona}
         Mission:
         - Summarize PDFs, images, and texts
         - Generate quizzes, flashcards, and explanations
         - Create study plans (1 to 30 days)
         - Tutor the user in any subject with step-by-step clarity
-        Behavior Rules:
-        - Always use a friendly, motivating tone.
-        - Adapt your explanations to the user’s level.
-        - Always answer step by step if the user asks for explanations.
-        - Never invent fake data; ask for more details if needed.
-        - Use tables, bullet points, and clean structure.
-        - ${languageInstruction}
         ${additionalContext ? `Additional context: ${additionalContext}` : ''}
+        ${textInput ? `Context text: ${textInput}` : ''}
       `;
+
+      // Conversion de l'historique client (ChatMessage[]) vers le format SDK
+      // Client: { role: 'user'|'model', text: string }
+      // SDK: { role: 'user'|'model', parts: [{ text: string }] }
+      let sdkHistory = [];
       
-      // Create chat with history (excluding the new message which we send via sendMessage)
+      // Si un fichier est présent, on l'ajoute comme premier message 'user' dans l'historique simulé
+      if (fileData) {
+        sdkHistory.push({
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: fileData.mimeType,
+                data: fileData.data
+              }
+            },
+            { text: "Here is the document I want to study." }
+          ]
+        });
+        sdkHistory.push({
+          role: 'model',
+          parts: [{ text: "I have received your document. What would you like to know?" }]
+        });
+      }
+
+      // Ajout de l'historique de conversation existant
+      if (history && Array.isArray(history)) {
+        history.forEach(msg => {
+            // On saute les messages d'erreur ou vides
+            if(!msg.text || msg.isError) return;
+            
+            sdkHistory.push({
+                role: msg.role === 'user' ? 'user' : 'model',
+                parts: [{ text: msg.text }]
+            });
+        });
+      }
+
       const chat = ai.chats.create({
         model: MODEL_NAME,
         config: { systemInstruction },
-        history: history
+        history: sdkHistory
       });
 
-      const result = await chat.sendMessage({ message: userMessage.parts[0].text });
+      const result = await chat.sendMessage({ message: message });
       return res.status(200).json({ text: result.text });
     }
 
-    // --- STANDARD GENERATION MODES ---
+    // --- AUTRES MODES (Summary, Quiz, etc.) ---
     const parts = [];
     if (fileData) {
       parts.push({
@@ -71,20 +105,6 @@ export default async function handler(req, res) {
     if (textInput) {
       parts.push({ text: textInput });
     }
-
-    const languageInstruction = language === 'fr' 
-      ? "IMPORTANT: You MUST generate ALL content in FRENCH." 
-      : "IMPORTANT: You MUST generate ALL content in ENGLISH.";
-
-    const basePersona = `
-      You are StudyGeniusAI, an intelligent study assistant.
-      Tone: Friendly, motivating, and adapted to the student's level.
-      Rules:
-      - Explain step-by-step.
-      - Use clear structures (bullet points, tables).
-      - No fake data.
-      - ${languageInstruction}
-    `;
 
     let prompt = "";
     let responseSchema = undefined;

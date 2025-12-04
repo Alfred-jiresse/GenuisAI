@@ -30,7 +30,12 @@ const callApi = async (payload: any) => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({}));
+      // Throw specific error messages
+      if (response.status === 413) throw new Error("File too large (Max 4.5MB)");
+      if (response.status === 504) throw new Error("Timeout: The AI took too long to respond.");
+      if (response.status === 500) throw new Error(errorData.error || "Server Error (Check API Key)");
+      
       throw new Error(errorData.error || `Erreur API: ${response.status}`);
     }
 

@@ -8,7 +8,7 @@ import ChatView from './components/ChatView';
 import WelcomeScreen from './components/WelcomeScreen';
 import LoginScreen from './components/LoginScreen';
 import { generateStudyMaterial, initializeChatSession, sendChatMessage } from './services/geminiService';
-import { UploadCloud, X, Sparkles, GraduationCap, Sun, Moon, Languages, LogOut, FileText, Clock, User as UserIcon } from './components/Icons';
+import { UploadCloud, X, Sparkles, GraduationCap, Sun, Moon, Languages, LogOut, FileText, Clock, User as UserIcon, ShieldAlert } from './components/Icons';
 
 const TRANSLATIONS = {
   en: {
@@ -17,7 +17,7 @@ const TRANSLATIONS = {
     subtitle: "Powered by Gemini 2.5",
     uploadTitle: "1. Upload Material",
     uploadPlaceholder: "Click to upload PDF or Image",
-    uploadSub: "Supports PDF, PNG, JPG",
+    uploadSub: "Max 3MB. Supports PDF, PNG, JPG",
     orPaste: "Or paste text",
     pastePlaceholder: "Paste your notes, lecture transcript, or topic here...",
     contextTitle: "2. Additional Context (Optional)",
@@ -29,6 +29,7 @@ const TRANSLATIONS = {
     generating: "Generating your study materials...",
     analyzing: "Analyzing content with Gemini AI",
     error: "Something went wrong. Please try again.",
+    fileTooLarge: "File is too large (Max 3MB). Please compress it or use text.",
     chatEmptyState: "Please upload content to start chatting with the AI Tutor.",
     tabs: {
       [AppMode.SUMMARY]: "Summary",
@@ -107,7 +108,7 @@ const TRANSLATIONS = {
     subtitle: "Propulsé par Gemini 2.5",
     uploadTitle: "1. Télécharger le support",
     uploadPlaceholder: "Cliquez pour ajouter PDF ou Image",
-    uploadSub: "Supporte PDF, PNG, JPG",
+    uploadSub: "Max 3MB. Supporte PDF, PNG, JPG",
     orPaste: "Ou collez du texte",
     pastePlaceholder: "Collez vos notes, transcription ou sujet ici...",
     contextTitle: "2. Contexte supplémentaire (Optionnel)",
@@ -119,6 +120,7 @@ const TRANSLATIONS = {
     generating: "Génération de vos supports d'étude...",
     analyzing: "Analyse du contenu avec Gemini AI",
     error: "Une erreur est survenue. Veuillez réessayer.",
+    fileTooLarge: "Fichier trop volumineux (Max 3MB). Veuillez le compresser ou utiliser du texte.",
     chatEmptyState: "Veuillez charger du contenu pour discuter avec le Tuteur IA.",
     tabs: {
       [AppMode.SUMMARY]: "Résumé",
@@ -202,6 +204,7 @@ function App() {
   const [fileData, setFileData] = useState<{ name: string; mimeType: string; data: string } | null>(null);
   const [textInput, setTextInput] = useState('');
   const [loading, setLoading] = useState<LoadingState>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [additionalContext, setAdditionalContext] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [language, setLanguage] = useState<Language>('fr');
@@ -258,11 +261,24 @@ function App() {
   useEffect(() => {
     setChatHistory([]);
     setChatInitialized(false);
+    setErrorMessage('');
   }, [fileData, textInput, language]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorMessage('');
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+
+      // LIMIT CHECK: 3MB (approx 3 * 1024 * 1024 bytes)
+      // Vercel Serverless Function limit is 4.5MB for body.
+      // Base64 encoding adds ~33% overhead.
+      // 3MB * 1.33 = ~4MB, which is safe.
+      if (file.size > 3 * 1024 * 1024) {
+        setErrorMessage(t.fileTooLarge);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
       const reader = new FileReader();
       
       reader.onload = (event) => {
@@ -281,6 +297,7 @@ function App() {
   const removeFile = () => {
     setFileData(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    setErrorMessage('');
   };
 
   const initChatIfNeeded = () => {
@@ -316,10 +333,7 @@ function App() {
 
     try {
       const responseText = await sendChatMessage(
-        chatHistory, // Send the *current* history (before new msg) or newHistory minus last?
-        // Actually for simplicity, let's pass the HISTORY (excluding current message) and the MESSAGE separately
-        // But here I passed `chatHistory` which is the state BEFORE update in a functional update pattern...
-        // Let's rely on the chatHistory state which contains previous messages.
+        chatHistory,
         message, 
         {
           fileData,
@@ -329,15 +343,16 @@ function App() {
         }
       );
       setChatHistory(prev => [...prev, { role: 'model', text: responseText }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chat error:", error);
-      setChatHistory(prev => [...prev, { role: 'model', text: t.error, isError: true }]);
+      setChatHistory(prev => [...prev, { role: 'model', text: `${t.error} (${error.message})`, isError: true }]);
     } finally {
       setIsChatLoading(false);
     }
   };
 
   const handleGenerate = async () => {
+    setErrorMessage('');
     if (!fileData && !textInput.trim()) return;
 
     if (activeMode === AppMode.CHAT) {
@@ -360,8 +375,9 @@ function App() {
         [`${activeMode}_${language}`]: result
       }));
       setLoading('success');
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error("Generation error:", error);
+      setErrorMessage(error.message || t.error);
       setLoading('error');
     }
   };
@@ -369,6 +385,7 @@ function App() {
   const handleTabChange = (mode: AppMode) => {
     setActiveMode(mode);
     setLoading('idle');
+    setErrorMessage('');
     
     if (mode === AppMode.CHAT) {
       // Auto-initialize chat if content exists
@@ -415,7 +432,12 @@ function App() {
     if (loading === 'error') {
       return (
         <div className="text-center py-12 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-800/30">
-          <p className="text-red-600 dark:text-red-400 font-medium">{t.error}</p>
+          <p className="text-red-600 dark:text-red-400 font-medium mb-2">{t.error}</p>
+          {errorMessage && (
+            <p className="text-sm text-red-500 dark:text-red-300 opacity-80 max-w-md mx-auto">
+              {errorMessage.includes('413') ? t.fileTooLarge : errorMessage}
+            </p>
+          )}
         </div>
       );
     }
@@ -547,6 +569,17 @@ function App() {
             </>
           )}
         </div>
+
+        {/* Error Banner at Top if file too large */}
+        {errorMessage && (
+            <div className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 flex items-center gap-3 animate-fadeIn">
+                <ShieldAlert size={20} />
+                <span className="font-medium">{errorMessage}</span>
+                <button onClick={() => setErrorMessage('')} className="ml-auto p-1 hover:bg-red-100 dark:hover:bg-red-800/50 rounded-full">
+                    <X size={16} />
+                </button>
+            </div>
+        )}
 
         {/* Input Section */}
         <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.07)] dark:shadow-[0_8px_25px_rgba(0,0,0,0.4)] p-8 mb-8 border border-gray-50 dark:border-gray-700 transition-colors duration-300">
